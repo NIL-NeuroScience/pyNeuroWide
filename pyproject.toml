@@ -1,0 +1,15 @@
+[project]
+name = "pyNeuroWide"
+version = "0.1.0"
+description = "Widefield neural data analysis"
+authors = [{name = "Bradley Rauscher"}]
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "h5py",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
