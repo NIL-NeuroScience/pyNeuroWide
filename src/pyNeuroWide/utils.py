@@ -5,42 +5,42 @@ Utility functions for analyzing widefield neural datasets.
 
 author: Bradley Rauscher (March, 2026)
 """
-
-# =================================
-# Imports
-# =================================
 # %%
 import numpy as np
 import h5py
+import os
 
 # %%
-# =================================
-# Public Functions
-# =================================
 
-def load_H5(path, var=None, frames=None):
-    """
-    Load .h5 files storing widefield imaging data.
-    """
+def list_dir_struct(path: str):
+    folders = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+    N = len(folders)
+
+    dir_struct = {}
+
+    for i in range(N):
+        dir_struct[folders[i]] = os.listdir(path + '/' + folders[i])
     
-    if var is None:
-        var = [1, 1, 1, 1, 1, 1]
+    return dir_struct
+
+def list_runs(files: str):
+    N = len(files)
     
-    varPath = ['rfp/norm', 'rfp/normHD', 'gfp/norm', 'gfp/normHD', 
-               'hemodynamics/HbO', 'hemodynamics/Hb']
-    varName = ['rpf', 'rfp_HD', 'gfp', 'gfp_HD', 'HbO', 'HbR']
+    if N == 0:
+        return None
 
-    with h5py.File(path, "r") as f:
-        data = {}
+    runs = []
 
-        for i in range(6):
-            if var[i]:
-                if frames is None:
-                    data[varName[i]] = f[varPath[i]][:]
-                else:
-                    data[varName[i]] = f[varPath[i]][frames]
+    for i in range(N):
+        filename = []
+        for f in files[i]:
+            if f == '.':
+                break
 
-    if var[4] and var[5]:
-        data['HbT'] = data['HbO'] + data['HbR']
+            if f.isdigit():
+                filename.append(f)
+        
+        if len(filename):
+            runs.append(int(''.join(filename)))
 
-    return data
+    return runs
