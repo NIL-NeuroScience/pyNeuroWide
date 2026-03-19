@@ -8,7 +8,12 @@ author: Bradley Rauscher (March, 2026)
 # %%
 import numpy as np
 import h5py
+
 import os
+import json
+from pyNeuroWide import processing as pnw
+from importlib.resources import files
+import yaml
 
 # %%
 
@@ -229,3 +234,153 @@ def import_settings(path: str):
 # ======================================
 # saving functions
 # ======================================
+
+# ======================================
+# data class
+# ======================================
+
+# path = '/projectnb/devorlab/bcraus/AnalysisCode/tests'
+class data_1P:
+    def __init__(self, path, frames=None, smoothing=None):
+        # organize paths
+        self.path = path
+        bin_path = path + '/data.bin'
+        meta_path = path + '/meta.json'
+
+        # intialize properties
+        self._gfp = None
+        self._rfp = None
+        self._gfp_HD = None
+        self._rfp_HD = None
+        self._HbO = None
+        self._HbR = None
+
+        # setup preprocessing parameters
+        config_path = files("pyNeuroWide.config").joinpath("default.yaml")
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+
+        if smoothing is None:
+            self.sm = config['preprocessing']['smoothing_sigma']
+        else:
+            self.sm = smoothing
+
+        # load metadata from meta.json
+        with open(meta_path, "r") as f:
+            self.meta = json.load(f)
+        
+        # load data from data.bin
+        if frames is None:
+            raw_data = np.fromfile(bin_path, dtype=self.meta['dtype'])
+
+            # determine channel indices
+            raw_data = raw_data.reshape(tuple(self.meta['shape']), order=self.meta['order'])
+            self.raw_data = raw_data.transpose(3, 2, 0, 1)
+        else:
+            raw_data = np.memmap(bin_path,
+                                 dtype=self.meta['dtype'],
+                                 mode='r',
+                                 shape=tuple(self.meta['shape']),
+                                 order=self.meta['order'])
+            raw_data = raw_data.transpose(3, 2, 0, 1)
+            self.raw_data = raw_data[frames].copy()
+
+    @property
+    def gfp(self):
+        if 470 not in self.meta['channel_order']:
+            raise ValueError("Channel 470 not found! Cannot compute gfp")
+        else:
+            channel_idx = self.meta['channel_order'].index(470)
+
+        if self._gfp is None:
+            self._gfp = self.compute_dff(self.raw_data[:,channel_idx])
+            self._gfp = pnw.smooth_2D(self._gfp, sigma=self.sm, dims=[0,1,1])
+        return self._gfp
+    
+    @property
+    def gfp_HD(self):
+        if 470 not in self.meta['channel_order']:
+            raise ValueError("Channel 470 not found! Cannot compute gfp")
+        else:
+            channel_idx = self.meta['channel_order'].index(470)
+
+        if self._gfp_HD is None:
+            gfp = self.compute_dff(self.raw_data[:,channel_idx])
+            self._gfp_HD = pnw.green_HD_correction(gfp, self.HbO, self.HbR)
+            self._gfp_HD = pnw.smooth_2D(self._gfp_HD, sigma=self.sm, dims=[0,1,1])
+
+        return self._gfp_HD
+
+    @property
+    def rfp(self):
+        if 565 not in self.meta['channel_order']:
+            raise ValueError("Channel 565 not found! Cannot compute rfp")
+        else:
+            channel_idx = self.meta['channel_order'].index(565)
+        
+        if self._rfp is None:
+            self._rfp = self.compute_dff(self.raw_data[:,channel_idx])
+            self._rfp = pnw.smooth_2D(self._rfp, sigma=self.sm, dims=[0,1,1])
+        return self._rfp
+    
+    @property
+    def rfp_HD(self):
+        if 565 not in self.meta['channel_order']:
+            raise ValueError("Channel 565 not found! Cannot compute rfp")
+        else:
+            channel_idx = self.meta['channel_order'].index(565)
+
+        if self._rfp_HD is None:
+            HD1_idx = self.meta['channel_order'].index(525)
+            HD2_idx = self.meta['channel_order'].index(625)
+
+            rfp = self.compute_dff(self.raw_data[:,channel_idx])
+            self._rfp_HD = pnw.red_HD_correction(rfp, self.raw_data[:,HD1_idx], self.raw_data[:,HD2_idx])
+            self._rfp_HD = pnw.smooth_2D(self._rfp_HD, sigma=self.sm, dims=[0,1,1])
+            
+        return self._rfp_HD
+    
+    @property
+    def HbO(self):
+        if self._HbO is None:
+            if 525 not in self.meta['channel_order'] and 625 not in self.meta['channel_order']:
+                raise ValueError("Channel 525 and 625 not found! Cannot compute hemodynamics")
+            elif 525 not in self.meta['channel_order']:
+                raise ValueError("Channel 525 not found! Cannot compute hemodynamics")
+            elif 625 not in self.meta['channel_order']:
+                raise ValueError("Channel 625 not found! Cannot compute hemodynamics")
+            else:
+                HD1_idx = self.meta['channel_order'].index(525)
+                HD2_idx = self.meta['channel_order'].index(625)
+
+            self._HbO, self._HbR = pnw.estimateHemodynamics(self.raw_data[:,HD1_idx], self.raw_data[:,HD2_idx])
+            self._HbO = pnw.smooth_2D(self._HbO, sigma=self.sm, dims=[0,1,1])
+            self._HbR = pnw.smooth_2D(self._HbR, sigma=self.sm, dims=[0,1,1])
+        return self._HbO
+    
+    @property
+    def HbR(self):
+        if self._HbR is None:
+            if 525 not in self.meta['channel_order'] and 625 not in self.meta['channel_order']:
+                raise ValueError("Channel 525 and 625 not found! Cannot compute hemodynamics")
+            elif 525 not in self.meta['channel_order']:
+                raise ValueError("Channel 525 not found! Cannot compute hemodynamics")
+            elif 625 not in self.meta['channel_order']:
+                raise ValueError("Channel 625 not found! Cannot compute hemodynamics")
+            else:
+                HD1_idx = self.meta['channel_order'].index(525)
+                HD2_idx = self.meta['channel_order'].index(625)
+
+            self._HbO, self._HbR = pnw.estimateHemodynamics(self.raw_data[:,HD1_idx], self.raw_data[:,HD2_idx])
+            self._HbO = pnw.smooth_2D(self._HbO, sigma=self.sm, dims=[0,1,1])
+            self._HbR = pnw.smooth_2D(self._HbR, sigma=self.sm, dims=[0,1,1])
+        return self._HbR
+    
+    @property
+    def HbT(self):
+        return self.HbO + self.HbR
+
+    def compute_dff(self, data):
+        F0 = data.mean(axis=0, keepdims=1)
+        return (data - F0) / F0
+# %%

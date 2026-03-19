@@ -16,13 +16,14 @@ import numpy as np
 from importlib.resources import files
 import pandas as pd
 from scipy.interpolate import interp1d
+from scipy.ndimage import gaussian_filter
 
 # %%
 # =================================
 # Public Functions
 # =================================
 
-def green_HD_correction(gfp, HbO, Hb, WL=np.array([470, 515])):
+def green_HD_correction(gfp, HbO, HbR, WL=np.array([470, 515])):
     """Apply a correction to the green channel signal to 
     account for HD artifact."""
     
@@ -30,8 +31,8 @@ def green_HD_correction(gfp, HbO, Hb, WL=np.array([470, 515])):
     pathEx = estimatePathlengths(np.array([WL[0]])) / 2
     pathEm = estimatePathlengths(np.array([WL[1]])) / 2
 
-    muaEx = (exs[0, 0] * HbO) + (exs[0, 1] * Hb)
-    muaEm = (exs[1, 0] * HbO) + (exs[1, 1] * Hb)
+    muaEx = (exs[0, 0] * HbO) + (exs[0, 1] * HbR)
+    muaEm = (exs[1, 0] * HbO) + (exs[1, 1] * HbR)
 
     gfp_HD = (gfp + 1) / np.exp(-(muaEx * pathEx + muaEm * pathEm)) - 1
 
@@ -121,7 +122,19 @@ def estimateHemodynamics(ch1, ch2, lambda1=525, lambda2=625):
     A0Hb = cLambda2Hb * np.log(np.mean(ch2, axis=0)) - cLambda1Hb * np.log(np.mean(ch1, axis=0))
     A0HbO = cLambda2HbO * np.log(np.mean(ch2, axis=0)) - cLambda1HbO * np.log(np.mean(ch1, axis=0))
 
-    HbO = (A0HbO + cLambda1HbO * np.log(ch1)) - cLambda2HbO * np.log(ch2)
-    Hb = (A0Hb + cLambda1Hb * np.log(ch1)) - cLambda2Hb * np.log(ch2)
+    HbO = A0HbO + cLambda1HbO * np.log(ch1) - cLambda2HbO * np.log(ch2)
+    HbR = A0Hb + cLambda1Hb * np.log(ch1) - cLambda2Hb * np.log(ch2)
 
-    return HbO, Hb
+    return HbO, HbR
+
+def smooth_2D(video, sigma, dims=[0,0,1,1]):
+    # apply only to spatial dims (H, W)
+    if sigma == 0:
+        return video
+    
+    shape = tuple(sigma if d else 0 for d in dims)
+    smoothed = gaussian_filter(
+        video,
+        sigma=shape  # H, W, C, T
+    )
+    return smoothed

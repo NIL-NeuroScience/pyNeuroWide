@@ -18,7 +18,6 @@ settings = io.import_settings(path_settings)
 settings['LEDOrder'] = settings['LEDOrder'].transpose()
 settings['LEDOrder'] = [''.join([chr(c) for c in f]) for f in settings['LEDOrder']]
 
-
 # %% get indices for each imaging channel
 rfp_idx = [i for i,v in enumerate(settings['LEDOrder']) if v == '565'][0]
 gfp_idx = [i for i,v in enumerate(settings['LEDOrder']) if v == '470'][0]
