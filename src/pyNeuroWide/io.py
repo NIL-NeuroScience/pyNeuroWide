@@ -14,6 +14,8 @@ import json
 from pyNeuroWide import processing as pnw
 from importlib.resources import files
 import yaml
+import imageio.v2 as imageio
+import subprocess
 
 # %%
 
@@ -215,7 +217,68 @@ def import_DAT(path: str, n_channels: int = 1, frames=None):
             rawImage[iFile] = tmpIn[tmpMetaInd].reshape((metadata['imagesperfile'], (metadata['imagesizebytes'] - removeRows) // metadata['aoistride'], metadata['aoistride'] // metadata['aoistrideFactor']))
 
     rawImage = rawImage.reshape(-1, metadata['aoiheight'], metadata['aoiwidth'])
-    return rawImage[0:fileImport['imagesRequested']].reshape(-1, n_channels, metadata['aoiheight'], metadata['aoiwidth'])
+    
+    rawImage = rawImage[0:fileImport['imagesRequested']]
+    # check if there's a mismatch in the number of frames, and add more to the beginning if necessary
+    error_frames = rawImage.shape[0] % n_channels
+    print(f"Number of error frames: {error_frames}")
+    if error_frames != 0:
+        print("Error in number of frames acquired")
+        add_frames = n_channels - error_frames
+        frames = np.zeros((add_frames, rawImage.shape[1], rawImage.shape[2]))
+        for n in range(add_frames):
+            first_idx = n_channels - add_frames + n
+            frames[n] = rawImage[np.arange(first_idx, rawImage.shape[0], n_channels)].mean(axis=0)
+        
+        print(frames.shape)
+        rawImage = np.concatenate((frames, rawImage), axis=0)
+        print(rawImage.shape)
+
+    return rawImage.reshape(-1, n_channels, metadata['aoiheight'], metadata['aoiwidth'])
+
+def import_tiff_files(path: str):
+    contents = sorted(os.listdir(path))
+
+    first = imageio.imread(path + "/" + contents[0])
+    T = len(contents)
+    H, W = first.shape
+
+    data = np.zeros((T, H, W), dtype=first.dtype)
+    for i, f in enumerate(contents):
+        data[i] = imageio.imread(path + "/" + f)
+    return data
+
+def video_compression(data, output: str):
+    T, H, W = data.shape
+    data = np.ascontiguousarray(data)
+
+    proc = subprocess.Popen([
+        "ffmpeg",
+        "-y",
+        "-f", "rawvideo",
+        "-pix_fmt", "gray",
+        "-s", f"{W}x{H}",
+        "-r", "10",
+        "-i", "-",
+        "-c:v", "libx264",
+        "-crf", "0",
+        "-preset", "veryslow",
+        f"{output}"
+    ], stdin=subprocess.PIPE)
+    
+    proc.stdin.write(data.tobytes())
+    proc.stdin.close()
+    proc.wait()
+
+def load_compressed_mp4(path: str):
+    reader = imageio.get_reader(path)
+    frames = []
+
+    for frame in reader:
+        frames.append(frame)
+    data = np.stack(frames)[:,:,:,0]
+    reader.close()
+    return data
 
 def import_settings(path: str):
     with h5py.File(path, "r") as f:
@@ -229,6 +292,9 @@ def import_settings(path: str):
         for i in range(N):
             settings[fieldnames[i]] = f_settings[fieldnames[i]][:]
 
+    settings["LEDOrder"] = settings["LEDOrder"].transpose()
+    settings["LEDOrder"] = [int(''.join([chr(c) for c in f])) for f in settings["LEDOrder"]]
+    
     return settings
 
 # ======================================
@@ -274,16 +340,17 @@ class data_1P:
             raw_data = np.fromfile(bin_path, dtype=self.meta['dtype'])
 
             # determine channel indices
-            raw_data = raw_data.reshape(tuple(self.meta['shape']), order=self.meta['order'])
-            self.raw_data = raw_data.transpose(3, 2, 0, 1)
+            self.raw_data = raw_data.reshape(tuple(self.meta['shape']), order=self.meta['order'])
         else:
             raw_data = np.memmap(bin_path,
                                  dtype=self.meta['dtype'],
                                  mode='r',
                                  shape=tuple(self.meta['shape']),
                                  order=self.meta['order'])
-            raw_data = raw_data.transpose(3, 2, 0, 1)
             self.raw_data = raw_data[frames].copy()
+
+        if self.meta['rotation']:
+            self.raw_data = np.rot90(self.raw_data, k=self.meta['rotation'] / 90, axes=(2,3)).copy()
 
     @property
     def gfp(self):
@@ -383,4 +450,3 @@ class data_1P:
     def compute_dff(self, data):
         F0 = data.mean(axis=0, keepdims=1)
         return (data - F0) / F0
-# %%

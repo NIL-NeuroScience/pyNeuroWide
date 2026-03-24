@@ -1,3 +1,4 @@
 preprocessing:
   # parameters for loading + cleaning data
   smoothing_sigma: 1.0
+  save_as_mat: True

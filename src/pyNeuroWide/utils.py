@@ -30,6 +30,7 @@ def list_runs(files: str):
         return None
 
     runs = []
+    run_names = []
 
     for i in range(N):
         filename = []
@@ -42,5 +43,29 @@ def list_runs(files: str):
         
         if len(filename):
             runs.append(int(''.join(filename)))
+            run_names.append(files[i])
 
-    return runs
+    idx = sorted(range(len(runs)), key=lambda i: runs[i])
+
+    return [runs[i] for i in idx], [run_names[i] for i in idx]
+
+def rmdir(path):
+    contents = os.listdir(path)
+    for filename in contents:
+        file_path = os.path.join(path, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+        elif os.path.isdir(file_path):
+            rmdir(file_path)
+    
+    os.rmdir(path)
+
+def convert_to_json_safe(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_to_json_safe(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_json_safe(v) for v in obj]
+    else:
+        return obj
