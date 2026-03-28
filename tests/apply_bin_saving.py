@@ -6,6 +6,7 @@ from pyNeuroWide import io, utils
 from pathlib import Path
 from scipy.io import loadmat
 from fullProcessing import full_processing
+from resave_behavior import resave_behCam
 
 # %%
 
@@ -17,40 +18,47 @@ for filename in os.listdir(path):
         contents.append(path + "/" + filename + "/" + second_level)
 
 contents = sorted(contents)
-
-# %% find dataIn rotation
-
 contents = contents[::-1]
-rotations = []
-flag_json = []
 
-for filename in contents:
-    dataIn_path = filename + "/dataIn.mat"
-    dataIn_json_path = filename + "/dataIn.json"
+# %% 
 
-    if os.path.exists(dataIn_path):
-        # print(f"Converting {filename}")
-        dataIn = loadmat(dataIn_path, struct_as_record=False, squeeze_me=True)["dataIn"]
+def delete_cam(path):
+    if not os.path.isdir(path + "/camera"):
+        return
+    
+    contents = os.listdir(path + "/camera")
+    mp4s = [name for name in contents if ".mp4" in name]
+    correct = [name for name in mp4s if "correct" in name]
+    incorrect = [name for name in mp4s if "correct" not in name]
 
-        if isinstance(dataIn, np.ndarray):
-            dataIn = dataIn[0]
+    runs_incorrect = [int(name[3:5]) for name in incorrect]
+    runs_correct = [int(name[3:5]) for name in correct]
 
-        if "rotation" in dataIn._fieldnames:
-            rotations.append(dataIn.rotation)
-        else:
-            rotations.append(1)
-    else:
-        rotations.append(None)
+    # if set(runs_incorrect) != set(runs_correct):
+    #     raise ValueError("Correct and incorrect runs do not match!!!")
 
-    if os.path.exists(dataIn_json_path):
-        flag_json.append(True)
-    else:
-        flag_json.append(False)
+    is_flag = os.path.exists(path + "/camera/flag_done.txt")
+    if not is_flag:
+        return
+    
+    # if not len(runs_correct):
+    #     # os.remove(path + "/camera/flag_done.txt")
+    #     return
+
+    for runs in correct:
+        new_name = runs.replace("_correct","")
+        os.rename(path + "/camera/" + runs, path + "/camera/" + new_name)
+    
+    os.remove(path + "/camera/flag_done.txt")
+    
+# delete_cam(contents[0])
 
 # %%
 
 N = len(contents)
 
-for i in range(30):
-    if not flag_json[i] and rotations[i] and rotations[i] != 1:
-        full_processing(contents[i], rotations[i])
+for i in range(N):
+    # if not flag_json[i] and rotations[i] and rotations[i] != 1:
+    #     print('Needs processing!')
+        # full_processing(contents[i], rotations[i])
+    delete_cam(contents[i])

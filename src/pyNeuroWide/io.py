@@ -16,6 +16,7 @@ from importlib.resources import files
 import yaml
 import imageio.v2 as imageio
 import subprocess
+from pathlib import Path
 
 # %%
 
@@ -237,8 +238,16 @@ def import_DAT(path: str, n_channels: int = 1, frames=None):
     return rawImage.reshape(-1, n_channels, metadata['aoiheight'], metadata['aoiwidth'])
 
 def import_tiff_files(path: str):
-    contents = sorted(os.listdir(path))
+    # properly index tiff files
+    idx = []
+    contents = os.listdir(path)
 
+    for file in contents:
+        idx.append(int(Path(file.split("_")[-1]).stem))
+    
+    idx = sorted(range(len(idx)), key=lambda i: idx[i])
+    contents = [contents[i] for i in idx]
+    
     first = imageio.imread(path + "/" + contents[0])
     T = len(contents)
     H, W = first.shape
@@ -278,6 +287,7 @@ def load_compressed_mp4(path: str):
         frames.append(frame)
     data = np.stack(frames)[:,:,:,0]
     reader.close()
+
     return data
 
 def import_settings(path: str):
