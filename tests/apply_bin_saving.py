@@ -9,6 +9,7 @@ from fullProcessing import full_processing
 from resave_behavior import resave_behCam
 
 # %%
+import os
 
 path = "/projectnb/devorlab/bcraus/HRF/1P"
 
@@ -20,45 +21,41 @@ for filename in os.listdir(path):
 contents = sorted(contents)
 contents = contents[::-1]
 
+# %% check for mp4 files
+
+run_paths = []
+for filename in contents:
+    if os.path.isdir(filename + "/camera"):
+        runs = os.listdir(filename + "/camera")
+    else:
+        continue
+
+    for run in runs:
+        if os.path.isdir(filename + "/camera/" + run) and not os.path.isfile(filename + "/camera/" + run + "_flag.txt"):
+            run_paths.append(filename + "/camera/" + run)
+
 # %% 
 
 def delete_cam(path):
-    if not os.path.isdir(path + "/camera"):
-        return
+    if not os.path.isdir(path):
+        raise ValueError("Given path is not a directory!")
     
-    contents = os.listdir(path + "/camera")
-    mp4s = [name for name in contents if ".mp4" in name]
-    correct = [name for name in mp4s if "correct" in name]
-    incorrect = [name for name in mp4s if "correct" not in name]
+    beh_video = io.import_tiff_files(path)
 
-    runs_incorrect = [int(name[3:5]) for name in incorrect]
-    runs_correct = [int(name[3:5]) for name in correct]
+    io.video_compression(beh_video, path + ".mp4")
 
-    # if set(runs_incorrect) != set(runs_correct):
-    #     raise ValueError("Correct and incorrect runs do not match!!!")
+    beh_video_comp = io.load_compressed_mp4(path + ".mp4")
 
-    is_flag = os.path.exists(path + "/camera/flag_done.txt")
-    if not is_flag:
-        return
+    if np.array_equal(beh_video, beh_video_comp):
+        print("\tSuccessfully compressed behavior video!")
+    else:
+        raise ValueError("Compressed video does not match input")
     
-    # if not len(runs_correct):
-    #     # os.remove(path + "/camera/flag_done.txt")
-    #     return
-
-    for runs in correct:
-        new_name = runs.replace("_correct","")
-        os.rename(path + "/camera/" + runs, path + "/camera/" + new_name)
-    
-    os.remove(path + "/camera/flag_done.txt")
-    
-# delete_cam(contents[0])
+    Path.touch(path + "_flag.txt")
 
 # %%
 
-N = len(contents)
+N = len(run_paths)
 
 for i in range(N):
-    # if not flag_json[i] and rotations[i] and rotations[i] != 1:
-    #     print('Needs processing!')
-        # full_processing(contents[i], rotations[i])
-    delete_cam(contents[i])
+    delete_cam(run_paths[i])

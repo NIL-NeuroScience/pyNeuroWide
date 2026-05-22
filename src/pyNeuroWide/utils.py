@@ -33,17 +33,19 @@ def list_runs(files: str):
     run_names = []
 
     for i in range(N):
-        filename = []
-        for f in files[i]:
-            if f == '.':
-                break
+        if "run" in files[i].lower():
+            filename = []
+            run_number = files[i].lower().split("run")
+            for f in run_number[1]:
+                if f == '.' or not f.isdigit():
+                    break
 
-            if f.isdigit():
-                filename.append(f)
-        
-        if len(filename):
-            runs.append(int(''.join(filename)))
-            run_names.append(files[i])
+                if f.isdigit():
+                    filename.append(f)
+            
+            if len(filename):
+                runs.append(int(''.join(filename)))
+                run_names.append(files[i])
 
     idx = sorted(range(len(runs)), key=lambda i: runs[i])
 

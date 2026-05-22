@@ -187,9 +187,9 @@ def import_DAT(path: str, n_channels: int = 1, frames=None):
     contents = [contents[i] for i in contents_idx]
 
     # set up import
-    print(f'Images acquired: {metadata['totalImages_sifx']}; Images stored: {fileImport['totalImages']}')
-    print(f'Image dimensions: W {metadata['aoiwidth']} x H {metadata['aoiheight']} x T {metadata['totalImages_sifx']} ({metadata['rawPixelFormat']} depth at {metadata['pixelencoding']} encoding).')
-    print(f'Image size: ~{metadata['imagesizebytes'] * fileImport['totalImages'] / 1024**3} GB')
+    print(f"Images acquired: {metadata['totalImages_sifx']}; Images stored: {fileImport['totalImages']}")
+    print(f"Image dimensions: W {metadata['aoiwidth']} x H {metadata['aoiheight']} x T {metadata['totalImages_sifx']} ({metadata['rawPixelFormat']} depth at {metadata['pixelencoding']} encoding).")
+    print(f"Image size: ~{metadata['imagesizebytes'] * fileImport['totalImages'] / 1024**3} GB")
 
     fileImport['imagesRequested'] = metadata['totalImages_sifx']
     fileImport['filesRequested'] = (metadata['totalImages_sifx'] + metadata['imagesperfile'] - 1) // metadata['imagesperfile']
@@ -307,6 +307,44 @@ def import_settings(path: str):
     
     return settings
 
+def read_suite2p_bin(path, frames=[], chans=[]):
+    path = "/projectnb/devorlab/bcraus/HRF/2P/26-04-10/Rbp4_132/twophoton/Run05_20x_4z_220um-209"
+    path = path + "/suite2p/plane0"
+    contents = os.listdir(path)
+
+    channels = []
+    for i in contents:
+        if "data" in i:
+            channels.append(i)
+
+    channels = sorted(channels)
+
+    ops = np.load(path + "/ops.npy", allow_pickle=True)
+
+    Ly = ops.item()["Ly"]
+    Lx = ops.item()["Lx"]
+
+    data = []
+
+    for idx, name in enumerate(channels):
+        if idx in chans:
+            load_data = np.memmap(
+                path + "/" + name,
+                dtype=np.int16,
+                mode='r'
+            )
+            
+            n_frames = load_data.size // (Ly * Lx)
+            load_frames = load_data.reshape(n_frames, Ly, Lx)
+
+            if isinstance(frames, np.ndarray):
+                data.append(load_frames[frames])
+            else:
+                data.append(load_frames[:])
+    
+    return data
+    
+
 # ======================================
 # saving functions
 # ======================================
@@ -314,6 +352,141 @@ def import_settings(path: str):
 # ======================================
 # data class
 # ======================================
+
+def read_XML(path):
+    import xml.etree.ElementTree as ET
+
+    tree = ET.parse(path)
+    root = tree.getroot()
+
+    # Initialize variables to None
+    frameRate = None
+    rastersPerFrame = None
+    objectiveLens = None
+    activeMode = None
+    objectiveLensMag = None
+    objectiveLensNA = None
+    opticalZoom = None
+    micronsPerPixel_X = None
+    micronsPerPixel_Y = None
+    micronsPerPixel_Z = None
+    laserPower = None
+    laserWavelength = None
+    pmtGain_FarRed = None
+    pmtGain_Red = None
+    pmtGain_Green = None
+    pmtGain_Blue = None
+    position_Z = None
+
+    # Iterate through all PVStateValue nodes
+    for node in root.findall('.//PVStateValue'):
+        key = node.get('key')
+
+        if key == 'framePeriod':
+            framePeriod = float(node.get('value'))
+            frameRate = 1 / framePeriod
+
+        elif key == 'rastersPerFrame':
+            rastersPerFrame = float(node.get('value'))
+
+        elif key == 'objectiveLens':
+            objectiveLens = node.get('value')
+
+        elif key == 'activeMode':
+            activeMode = node.get('value')
+
+        elif key == 'objectiveLensMag':
+            objectiveLensMag = float(node.get('value'))
+
+        elif key == 'objectiveLensNA':
+            objectiveLensNA = float(node.get('value'))
+
+        elif key == 'opticalZoom':
+            opticalZoom = float(node.get('value'))
+
+        elif key == 'micronsPerPixel':
+            children = node.findall('IndexedValue')
+            for child in children:
+                index = child.get('index')
+                value = float(child.get('value'))
+
+                if index == 'XAxis':
+                    micronsPerPixel_X = value
+                elif index == 'YAxis':
+                    micronsPerPixel_Y = value
+                elif index == 'ZAxis':
+                    micronsPerPixel_Z = value
+
+        elif key == 'laserPower':
+            children = node.findall('IndexedValue')
+            for child in children:
+                index = child.get('index')
+                value = float(child.get('value'))
+
+                if index == '0':
+                    laserPower = value
+
+        elif key == 'laserWavelength':
+            children = node.findall('IndexedValue')
+            for child in children:
+                index = child.get('index')
+                value = float(child.get('value'))
+
+                if index == '0':
+                    laserWavelength = value
+
+        elif key == 'pmtGain':
+            children = node.findall('IndexedValue')
+            for child in children:
+                index = child.get('index')
+                value = float(child.get('value'))
+
+                if index == '0':
+                    pmtGain_FarRed = value
+                elif index == '1':
+                    pmtGain_Red = value
+                elif index == '2':
+                    pmtGain_Green = value
+                elif index == '3':
+                    pmtGain_Blue = value
+
+        elif key == 'positionCurrent':
+            children = node.findall('SubindexedValues')
+            child = children[0]
+
+            if child:
+                position_Z = float(child.findall('SubindexedValue')[0].get('value'))
+
+    # Build settings dictionary
+    settings = {
+        'frameRate': frameRate / rastersPerFrame if frameRate and rastersPerFrame else None,
+        'rastersPerFrame': rastersPerFrame,
+        'objective': {
+            'Lens': objectiveLens,
+            'LensMag': objectiveLensMag,
+            'LensNA': objectiveLensNA
+        },
+        'opticalZoom': opticalZoom,
+        'micronsPerPixel': {
+            'X': micronsPerPixel_X,
+            'Y': micronsPerPixel_Y,
+            'Z': micronsPerPixel_Z
+        },
+        'laser': {
+            'Power': laserPower,
+            'Wavelength': laserWavelength
+        },
+        'activeMode': activeMode,
+        'pmtGain': {
+            'FarRed': pmtGain_FarRed,
+            'Red': pmtGain_Red,
+            'Green': pmtGain_Green,
+            'Blue': pmtGain_Blue
+        },
+        'position_Z': position_Z
+    }
+
+    return settings
 
 # path = '/projectnb/devorlab/bcraus/AnalysisCode/tests'
 class data_1P:

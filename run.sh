@@ -1,12 +1,14 @@
 #!/bin/bash -l
 
-#$ -N apply_bin_saving
+#$ -N motion_correction
 #$ -j y
 #$ -pe omp 6
 #$ -P devorlab
 #% -l buyin
 
 cd /project/devorlab/bcraus/projects/pyNeuroWide
-source /project/devorlab/bcraus/envs/pnw/bin/activate
+# source /project/devorlab/bcraus/envs/s2p/bin/activate
+module load miniconda
+conda activate pnw
 
-python -u tests/apply_bin_saving.py
+python -u examples/processing_2P.py --path /projectnb/devorlab/bcraus/HRF/2P/26-04-10/Rbp4_132
