@@ -5,7 +5,7 @@ import numpy as np
 import tempfile
 import tifffile
 from suite2p import run_s2p, default_ops
-from pyNeuroWide import utils, io
+from pyNeuroWide import utils, io, cell_classification
 from threadpoolctl import threadpool_limits
 import torch
 import argparse

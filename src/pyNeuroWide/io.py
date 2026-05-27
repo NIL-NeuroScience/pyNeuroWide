@@ -308,7 +308,7 @@ def import_settings(path: str):
     return settings
 
 def read_suite2p_bin(path, frames=[], chans=[]):
-    path = "/projectnb/devorlab/bcraus/HRF/2P/26-04-10/Rbp4_132/twophoton/Run05_20x_4z_220um-209"
+    # path = "/projectnb/devorlab/bcraus/HRF/2P/26-04-10/Rbp4_132/twophoton/Run05_20x_4z_220um-209"
     path = path + "/suite2p/plane0"
     contents = os.listdir(path)
 
