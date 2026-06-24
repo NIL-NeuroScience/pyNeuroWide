@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 import argparse
-from pyNeuroWide import io, processing
+from pyNeuroWide import io, process
 import numpy as np
 import os
 from matplotlib import pyplot as plt
@@ -31,7 +31,7 @@ def classify(data: str, ops=None, findCells=True):
     dendrite_trim = ops["dendrite_trim"] / resolution
 
     # %% data processing
-    data = processing.bpf(data, fr=[0,ops["low_pass_cutoff"]], fs=ops["framerate"], axis=0)
+    data = process.bpf(data, fr=[0,ops["low_pass_cutoff"]], fs=ops["framerate"], axis=0)
 
     # %% compute reference images
     corr_img = compute_local_correlation(data, radius=local_corr_radius)

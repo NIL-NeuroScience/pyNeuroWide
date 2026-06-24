@@ -11,7 +11,7 @@ import h5py
 
 import os
 import json
-from pyNeuroWide import processing as pnw
+from pyNeuroWide import process as pnw
 from importlib.resources import files
 import yaml
 import imageio.v2 as imageio

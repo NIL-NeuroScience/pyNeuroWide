@@ -1,6 +1,6 @@
 # %%
 from pyNeuroWide import io, utils
-from pyNeuroWide import processing as pnw
+from pyNeuroWide import process as pnw
 import numpy as np
 import json
 import os

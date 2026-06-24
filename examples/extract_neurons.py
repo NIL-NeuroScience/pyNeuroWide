@@ -1,5 +1,5 @@
 # %%
-from pyNeuroWide import utils, io, processing
+from pyNeuroWide import process, utils, io
 import numpy as np
 import os
 from matplotlib import pyplot as plt
@@ -13,8 +13,8 @@ from skimage.feature import blob_log
 
 # data = io.read_suite2p_bin(1,np.arange(1,2001),[0])[0]
 data = np.load("/Users/bcraus/Library/Mobile Documents/com~apple~CloudDocs/Documents/BostonU/Research/DevorLab/code/datasets/test2Pdata.npy")
-data = processing.smooth_2d_new(data, sigma=1, axis=0)
-data = processing.bpf(data, fr=[0,5], fs=15, axis=0)
+data = process.smooth_2d_new(data, sigma=1, axis=0)
+data = process.bpf(data, fr=[0,5], fs=15, axis=0)
 # data is (t, y, x) np.array of two-photon neural Ca imaging data
 
 # %% plot mean

@@ -18,8 +18,8 @@ import pandas as pd
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter
 from scipy.signal import butter, filtfilt
-from suite2p.run_s2p import run_s2p
-from suite2p import default_ops
+# from suite2p.run_s2p import run_s2p
+# from suite2p import default_ops
 import os
 from tifffile import imread
 import tifffile
@@ -91,7 +91,7 @@ def getExtinctionCoefficients(Lambda):
 
     return exs
 
-def estimatePathlengths(Lambda):
+def estimatePathlengths(Lambda, factor=0.4):
     """Returns estimated path lengths for Lambda"""
     HbO = 60e-6
     Hb = 40e-6
@@ -100,7 +100,7 @@ def estimatePathlengths(Lambda):
     e = getExtinctionCoefficients(Lambda)
 
     mua = e[:,0] * HbO + e[:,1] * Hb
-    mus = 150 * (Lambda / 560) ** (-2)
+    mus = factor * 150 * (Lambda / 560) ** (-2)
 
     z0 = 1 / ((1 - g) * mus)
     gamma = np.sqrt(c / (3 * (mua + (1 - g) * mus)))
@@ -147,85 +147,85 @@ def smooth_2D(video, sigma, dims=[0,0,1,1]):
     )
     return smoothed
 
-def motion_correction(path: str, ops=None):
-    # suite2P motion correction
+# def motion_correction(path: str, ops=None):
+#     # suite2P motion correction
 
-    # organize .tiff files
+#     # organize .tiff files
 
-    print("Loading and reformatting .tiff files")
-    contents = os.listdir(path)
+#     print("Loading and reformatting .tiff files")
+#     contents = os.listdir(path)
 
-    tiffs = []
-    for file in contents:
-        parts = file.split(".")
-        if len(parts) > 1 and parts[-1] == "tif":
-            tiffs.append(file)
+#     tiffs = []
+#     for file in contents:
+#         parts = file.split(".")
+#         if len(parts) > 1 and parts[-1] == "tif":
+#             tiffs.append(file)
 
-    channels = []
-    for tiff in tiffs:
-        parts = tiff.split("Ch")
-        channels.append(int(parts[1][0]))
+#     channels = []
+#     for tiff in tiffs:
+#         parts = tiff.split("Ch")
+#         channels.append(int(parts[1][0]))
 
-    unique_channels = sorted(list(set(channels)))
-    n_channels = len(unique_channels)
+#     unique_channels = sorted(list(set(channels)))
+#     n_channels = len(unique_channels)
 
-    for c in range(len(unique_channels)):
-        ch_tiffs = [tiff for tiff in tiffs if "Ch" + str(unique_channels[c]) in tiff]
-        ch_tiffs = sorted(ch_tiffs)
-        for rep in range(len(ch_tiffs)):
-            if rep == 0:
-                ch_data = imread(path + "/" + ch_tiffs[rep])
-            else:
-                ch_data = np.concatenate([ch_data, imread(path + "/" + ch_tiffs[rep])], axis=0)
+#     for c in range(len(unique_channels)):
+#         ch_tiffs = [tiff for tiff in tiffs if "Ch" + str(unique_channels[c]) in tiff]
+#         ch_tiffs = sorted(ch_tiffs)
+#         for rep in range(len(ch_tiffs)):
+#             if rep == 0:
+#                 ch_data = imread(path + "/" + ch_tiffs[rep])
+#             else:
+#                 ch_data = np.concatenate([ch_data, imread(path + "/" + ch_tiffs[rep])], axis=0)
         
-        if c == 0:
-            all_data = ch_data
-        else:
-            all_data = np.stack([all_data, ch_data], axis=3)
+#         if c == 0:
+#             all_data = ch_data
+#         else:
+#             all_data = np.stack([all_data, ch_data], axis=3)
 
-    T, H, W, C = all_data.shape
+#     T, H, W, C = all_data.shape
 
-    # all_data = all_data.transpose(0,3,1,2).reshape(T * C, H, W)
+#     # all_data = all_data.transpose(0,3,1,2).reshape(T * C, H, W)
     
-    print("Saving reformatted data")
-    tmp_save_dir = tempfile.mkdtemp()
-    print(tmp_save_dir)
-    # tifffile.imwrite(tmp_save_dir + "/data_chan0.tif", all_data[:,:,:,0])
-    tifffile.imwrite(tmp_save_dir + "/data_chan1.tif", all_data[:,:,:,1])
+#     print("Saving reformatted data")
+#     tmp_save_dir = tempfile.mkdtemp()
+#     print(tmp_save_dir)
+#     # tifffile.imwrite(tmp_save_dir + "/data_chan0.tif", all_data[:,:,:,0])
+#     tifffile.imwrite(tmp_save_dir + "/data_chan1.tif", all_data[:,:,:,1])
 
-    try:
-        print("Starting motion correction")
-        if ops is None:
-            ops = default_ops.default_ops()
+#     try:
+#         print("Starting motion correction")
+#         if ops is None:
+#             ops = default_ops.default_ops()
 
-            # Optional: tune registration parameters
-            # ops['nonrigid'] = False           # nonrigid correction (recommended)
-            # ops['block_size'] = [128, 128]   # size of blocks for nonrigid
-            # ops['maxregshift'] = 0.1         # max shift as fraction of frame
-            # ops['smooth_sigma'] = 1.15
-            # ops['save_path0'] = path
-            # ops['fast_disk'] = path
-            # ops['nchannels'] = 1
-            # ops['nplanes'] = 1
-            # ops['functional_chan'] = 1
+#             # Optional: tune registration parameters
+#             # ops['nonrigid'] = False           # nonrigid correction (recommended)
+#             # ops['block_size'] = [128, 128]   # size of blocks for nonrigid
+#             # ops['maxregshift'] = 0.1         # max shift as fraction of frame
+#             # ops['smooth_sigma'] = 1.15
+#             # ops['save_path0'] = path
+#             # ops['fast_disk'] = path
+#             # ops['nchannels'] = 1
+#             # ops['nplanes'] = 1
+#             # ops['functional_chan'] = 1
 
-        # Turn on motion correction (it is on by default)
-        # ops['do_registration'] = True
-        # ops['roidetect'] = False
-        # ops['do_classification'] = False
+#         # Turn on motion correction (it is on by default)
+#         # ops['do_registration'] = True
+#         # ops['roidetect'] = False
+#         # ops['do_classification'] = False
 
-        # Define data path
-        db = {
-            'data_path': [path],
-            'save_path0': path,
-            'fast_disk': path
-        }
+#         # Define data path
+#         db = {
+#             'data_path': [path],
+#             'save_path0': path,
+#             'fast_disk': path
+#         }
 
-        # Run Suite2p
-        run_s2p(db=db, settings=ops)
-    finally:
-        print('Deleting temporary .tif data!')
-        utils.rmdir(tmp_save_dir)
+#         # Run Suite2p
+#         run_s2p(db=db, settings=ops)
+#     finally:
+#         print('Deleting temporary .tif data!')
+#         utils.rmdir(tmp_save_dir)
 
 def bpf(signal, fr=[0,1], fs=1, axis=0):
     order = 6

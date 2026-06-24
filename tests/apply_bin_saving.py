@@ -5,7 +5,7 @@ import json
 from pyNeuroWide import io, utils
 from pathlib import Path
 from scipy.io import loadmat
-from fullProcessing import full_processing
+from examples.fullProcessing import full_processing
 from resave_behavior import resave_behCam
 
 # %%

@@ -8,7 +8,7 @@ author: Bradley Rauscher (June, 2026)
 # %%
 import numpy as np
 from pyNeuroWide import IRF, colors, plot, spectra
-from pyNeuroWide.processing import bpf
+from pyNeuroWide.process import bpf
 from matplotlib import pyplot as plt
 
 # %% load data
