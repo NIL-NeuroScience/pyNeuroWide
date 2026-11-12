@@ -15,6 +15,9 @@ from matplotlib import pyplot as plt
 Rbp4_path = "/Users/bcraus/Library/Mobile Documents/com~apple~CloudDocs/Documents/BostonU/Research/DevorLab/code/datasets/Rbp4_data.npy"
 data_Rbp4 = np.load(Rbp4_path, allow_pickle=True).item()
 
+# %% define save paths
+fig_1 = "/Users/bcraus/Library/Mobile Documents/com~apple~CloudDocs/Documents/BostonU/Research/DevorLab/Regulation of CBF by PNs/Figures/Figure_1/"
+
 # generate subject summary
 def log_summary(log):
     order = []
@@ -84,7 +87,7 @@ def data_analysis(data):
         r_Ca_HbT[:,i] = IRF.corr(data['HbT'][i], data['Ca'][i])
         IRF_global_r[:,i],IRF_global[:,i],_ = IRF.IRFx1(data['HbT'][i], data['Ca'][i], [0,100], [True] * 12)
         IRF_SSp_r[:,i],IRF_SSp[:,i],_ = IRF.IRFx1(data['HbT'][i], data['Ca'][i], [0,100], SSp_mask)
-        # IRF_var_r[:,i],IRF_var[:,:,i],_ = IRF.IRFx1_varWeights(data['HbT'][i], data['Ca'][i], [0,100])
+        IRF_var_r[:,i],IRF_var[:,:,i],_ = IRF.IRFx1_varWeights(data['HbT'][i], data['Ca'][i], [0,100])
         spc_Ca[:,:,i], fr = spectra.mtspectrumc(data['Ca'][i], tapers=[5,9], Fs=10, T=6000)
         spc_HbT[:,:,i], fr = spectra.mtspectrumc(data['raw_HbT'][i], tapers=[5,9], Fs=10, T=6000)
         coh_Ca_HbT[:,:,i], phi_Ca_HbT[:,:,i], fr = spectra.coherencyc(data['raw_HbT'][i], data['Ca'][i], tapers=[5,9], Fs=10, T=6000)
@@ -99,8 +102,8 @@ def data_analysis(data):
         subAvg['IRF_global'][:,i] = IRF_global[:,order[i]['Runs']].mean(axis=1)
         subAvg['IRF_SSp_r'][:,i] = IRF_SSp_r[:,order[i]['Runs']].mean(axis=1)
         subAvg['IRF_SSp'][:,i] = IRF_SSp[:,order[i]['Runs']].mean(axis=1)
-        # subAvg['IRF_var_r'][:,i] = IRF_var_r[:,order[i]['Runs']].mean(axis=1)
-        # subAvg['IRF_var'][:,:,i] = IRF_var[:,:,order[i]['Runs']].mean(axis=2)
+        subAvg['IRF_var_r'][:,i] = IRF_var_r[:,order[i]['Runs']].mean(axis=1)
+        subAvg['IRF_var'][:,:,i] = IRF_var[:,:,order[i]['Runs']].mean(axis=2)
         subAvg['spc_Ca'][:,:,i] = spc_Ca[:,:,order[i]['Runs']].mean(axis=2)
         subAvg['spc_HbT'][:,:,i] = spc_HbT[:,:,order[i]['Runs']].mean(axis=2)
         subAvg['coh_Ca_HbT'][:,:,i] = coh_Ca_HbT[:,:,order[i]['Runs']].mean(axis=2)
@@ -125,8 +128,11 @@ plt.rcParams.update({"font.size": 12})
 fig, axes = plt.subplots(5, 1, figsize=(10,6))
 
 axes[0].plot(t, data_Rbp4['Ca'][run_idx][:,4], color=colors.r(), linewidth=1)
-axes[1].plot(t, data_Rbp4['HbT'][run_idx][:,4] - 10, color=colors.b(), linewidth=1)
+axes[0].plot([t[-1]] * 2, [0,10], color=[0,0,0], linewidth=1)
+axes[1].plot(t, data_Rbp4['HbT'][run_idx][:,4], color=colors.b(), linewidth=1)
+axes[1].plot([t[-1]] * 2, [0,10], color=[0,0,0], linewidth=1)
 axes[2].plot(t, data_Rbp4['Pupil'][run_idx], color=colors.p(), linewidth=1)
+axes[2].plot([t[-1]] * 2, [0.3,0.6], color=[0,0,0], linewidth=1)
 axes[3].plot(t, data_Rbp4['Whisking'][run_idx], color=colors.c(), linewidth=1)
 axes[4].plot(t, data_Rbp4['Acc'][run_idx], color=[0,0,0], linewidth=1)
 
@@ -139,6 +145,7 @@ axes[4].plot(t, data_Rbp4['Acc'][run_idx], color=[0,0,0], linewidth=1)
 [axes[i].spines["bottom"].set_visible(False) for i in range(4)]
 [axes[i].set_ylabel(n) for i,n in enumerate(['Ca2+','HbT','Pupil','Whisking','Movement'])]
 axes[4].set_xlabel("Time (min)")
+fig.savefig(fig_1 + "signals.svg", format="svg", bbox_inches="tight")
 plt.show()
 
 # %% 
@@ -149,6 +156,7 @@ plot.allenMap(axes[0], subAvg_Rbp4['r_Ca_HbT'].mean(axis=1), clim=[0,1], clabel=
 plot.allenMap(axes[1], subAvg_Rbp4['IRF_global_r'].mean(axis=1), clim=[0,1], clabel='r', side='left', title='global')
 plot.allenMap(axes[2], subAvg_Rbp4['IRF_SSp_r'].mean(axis=1), clim=[0,1], clabel='r', side='left', title='SSp')
 plot.allenMap(axes[3], subAvg_Rbp4['IRF_var_r'].mean(axis=1), clim=[0,1], clabel='r', side='left', title='var')
+fig.savefig(fig_1 + "IRF_R.svg", format="svg", bbox_inches="tight")
 plt.show()
 
 # %%
@@ -183,6 +191,7 @@ plot.lineError(axes[1],
 [axes[i].spines["right"].set_visible(False) for i in range(2)]
 
 plt.show()
+
 # %%
 # plot xcorr
 
@@ -199,3 +208,5 @@ plot.lineError(axes,
 axes.spines["top"].set_visible(False)
 axes.spines["right"].set_visible(False)
 plt.show()
+
+# %%

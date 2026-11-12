@@ -11,6 +11,121 @@ from scipy.stats import chi2, t
 from scipy import signal
 
 # %%
+def morlet(data, Fs=None, fwin=None, steps=300, plot=False):
+    """
+    Estimate an instantaneous power spectrogram with Morlet wavelets.
+
+    This is a translation of ``morletSPG.m``. The first axis of ``data`` is
+    interpreted as time; additional axes are treated as independent signals.
+
+    Parameters
+    ----------
+    data : ndarray
+        Signal with shape ``(samples,)`` or ``(samples, signals)``.
+    Fs : float, optional
+        Sampling frequency in Hz. Defaults to 1.
+    fwin : array-like, optional
+        Lower and upper frequencies in Hz. Defaults to
+        ``[1 / duration, Fs / 2]``.
+    steps : int, optional
+        Number of logarithmically spaced frequencies. Defaults to 300.
+    plot : bool, optional
+        If True, plot the log-power spectrogram for a single signal.
+
+    Returns
+    -------
+    spg : ndarray
+        Instantaneous power. Shape is ``(samples, frequencies)`` for
+        one-dimensional input and ``(samples, frequencies, signals)`` for
+        two-dimensional input.
+    t : ndarray
+        Time axis in seconds.
+    frequencies : ndarray
+        Logarithmically spaced frequency axis in Hz.
+    """
+    if Fs is None:
+        Fs = 1.0
+
+    data = np.asarray(data)
+    if data.ndim == 1:
+        data = data[:, None]
+        squeeze_output = True
+    elif data.ndim == 2:
+        squeeze_output = False
+    else:
+        raise ValueError("data must be one- or two-dimensional")
+
+    if data.shape[0] == 0:
+        raise ValueError("data must contain at least one sample")
+    if Fs <= 0:
+        raise ValueError("Fs must be positive")
+    if not isinstance(steps, (int, np.integer)) or steps < 1:
+        raise ValueError("steps must be a positive integer")
+
+    n_samples = data.shape[0]
+    duration = n_samples / Fs
+    if fwin is None:
+        fwin = (1 / duration, Fs / 2)
+    fwin = np.asarray(fwin, dtype=float)
+    if fwin.shape != (2,) or not np.all(np.isfinite(fwin)):
+        raise ValueError("fwin must contain two finite frequencies")
+    if fwin[0] <= 0 or fwin[0] >= fwin[1] or fwin[1] > Fs / 2:
+        raise ValueError("fwin must satisfy 0 < fwin[0] < fwin[1] <= Fs / 2")
+
+    frequencies = np.geomspace(fwin[0], fwin[1], steps)
+    morletFWHM = 5
+    sigma_tc = morletFWHM / np.sqrt(8 * np.log(2))
+    
+    precision = 3
+    sample_period = 1 / Fs
+
+    power = np.zeros((n_samples, steps, data.shape[1]), dtype=float)
+    for index, frequency in enumerate(frequencies):
+        sigma_t = sigma_tc / frequency
+        wavelet_time = np.arange(
+            -precision * sigma_t,
+            precision * sigma_t + sample_period / 2,
+            sample_period,
+        )
+        # Match morletSPG.m: the Gaussian and carrier use f * time.
+        scaled_time = frequency * wavelet_time
+        wavelet = (
+            (sigma_tc * np.sqrt(np.pi)) ** -0.5
+            * np.exp(-(scaled_time**2) / (2 * sigma_tc**2))
+            * np.exp(1j * 2 * np.pi * scaled_time)
+        )
+        filtered = signal.fftconvolve(
+            data,
+            np.sqrt(frequency) * wavelet[:, None],
+            mode="same",
+            axes=0,
+        ) * sample_period
+        power[:, index, :] = np.abs(filtered) ** 2
+
+    t = np.arange(1, n_samples + 1) / Fs
+    if plot:
+        import matplotlib.pyplot as plt
+
+        if data.shape[1] != 1:
+            raise ValueError("plot=True requires a single signal")
+        log_power = np.log10(power[:, :, 0])
+        plt.pcolormesh(
+            t,
+            frequencies,
+            log_power.T,
+            shading="auto",
+        )
+        plt.yscale("log")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Frequency (Hz)")
+        plt.colorbar(label="Log10(Power)")
+        plt.clim(np.percentile(log_power.ravel(),(0.1,99.9)))
+        plt.show()
+
+    if squeeze_output:
+        power = power[:, :, 0]
+    return power, t, frequencies
+
 def coherencyc(data1, data2, tapers=[3,5], Fs=None, params=None, T=None):
     data1 = change_row_to_column(data1)
     data2 = change_row_to_column(data2)
